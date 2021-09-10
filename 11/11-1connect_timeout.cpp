@@ -21,6 +21,7 @@ int timeout_connect( const char* ip, int port, int time )
 
     int sockfd = socket( PF_INET, SOCK_STREAM, 0 );
     assert( sockfd >= 0 );
+    
     /* 通过选项SO_SRCVTIMEO和SO_SNDTIMEO所设置的超时事件类型是timeval，
     这和select系统调用的超时参数类型相同 */
     struct timeval timeout;
