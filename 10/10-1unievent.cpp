@@ -32,15 +32,16 @@ void addfd( int epollfd, int fd )
     epoll_ctl( epollfd, EPOLL_CTL_ADD, fd, &event );
     setnonblocking( fd );
 }
-
+/* 信号处理函数 */
 void sig_handler( int sig )
 {
+    /* 保留原来的errno，在函数最后恢复，以保证函数的可重入性 */
     int save_errno = errno;
     int msg = sig;
-    send( pipefd[1], ( char* )&msg, 1, 0 );
+    send( pipefd[1], ( char* )&msg, 1, 0 );/* 将信号值写入管道，以通知主循环 */
     errno = save_errno;
 }
-
+/* 设置信号的处理函数 */
 void addsig( int sig )
 {
     struct sigaction sa;
@@ -89,11 +90,13 @@ int main( int argc, char* argv[] )
     assert( epollfd != -1 );
     addfd( epollfd, listenfd );
 
+    /* 使用socketpair创建管道，注册pipefd[0]上的可读事件 */
     ret = socketpair( PF_UNIX, SOCK_STREAM, 0, pipefd );
     assert( ret != -1 );
     setnonblocking( pipefd[1] );
     addfd( epollfd, pipefd[0] );
 
+    // 设置一些信号的处理函数
     // add all the interesting signals here
     addsig( SIGHUP );
     addsig( SIGCHLD );
@@ -113,6 +116,7 @@ int main( int argc, char* argv[] )
         for ( int i = 0; i < number; i++ )
         {
             int sockfd = events[i].data.fd;
+            /* 如果就绪的文件描述符是listenfd，则处理新的连接 */
             if( sockfd == listenfd )
             {
                 struct sockaddr_in client_address;
@@ -120,6 +124,7 @@ int main( int argc, char* argv[] )
                 int connfd = accept( listenfd, ( struct sockaddr* )&client_address, &client_addrlength );
                 addfd( epollfd, connfd );
             }
+            /* 如果就绪的文件描述符是pipefd[0]，则处理信号 */
             else if( ( sockfd == pipefd[0] ) && ( events[i].events & EPOLLIN ) )
             {
                 int sig;
@@ -134,10 +139,14 @@ int main( int argc, char* argv[] )
                     continue;
                 }
                 else
-                {
+                {   
+                    /* 因为每个信号值占1字节，所以按字节来逐个接收信号。
+                    我们以SIGTERM为例，来说明如何安全地终止服务器主循环 */
                     for( int i = 0; i < ret; ++i )
                     {
-                        //printf( "I caugh the signal %d\n", signals[i] );
+                        printf( "I caugh the signal %d\n", signals[i] );
+                        /* pgrep -l 程序名（进程名）  ->   PID */
+                        /* 使用kill -x PID 来发送对应信号 */
                         switch( signals[i] )
                         {
                             case SIGCHLD:

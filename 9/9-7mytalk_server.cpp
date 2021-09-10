@@ -12,10 +12,20 @@
 #include <stdlib.h>
 #include <poll.h>
 
-#define USER_LIMIT 5
-#define BUFFER_SIZE 64
-#define FD_LIMIT 65535
-
+#define USER_LIMIT 5            // 最大用户数量
+#define BUFFER_SIZE 64          // 读缓冲区的大小
+#define FD_LIMIT 65535          // 文件描述符数量限制
+/* jyz's DBG func*/
+void display(pollfd *fds, int usrcnt){
+    int cnt = 0;
+    printf("fds[0:%d].revent: ", cnt);
+    while (cnt <= usrcnt){
+        printf("[%d:%d] ", cnt, fds[cnt].revents & POLLOUT);
+        ++cnt;
+    }
+    printf("\n");
+}
+/* 客户数据：客户socket地址、待写到客户端的数据的位置、从客户读入的数据 */
 struct client_data
 {
     sockaddr_in address;
@@ -57,7 +67,11 @@ int main( int argc, char* argv[] )
     ret = listen( listenfd, 5 );
     assert( ret != -1 );
 
+    /* 创建user数组，分配FD_LIMIT个client_data对象。可以预期：
+    每个可能的socket连接都获得一个这样的对象，并且socket值可以直接用来
+    索引socket连接对应的client_data对象，这是socket和客户数据关联的简单而高效的方式 */
     client_data* users = new client_data[FD_LIMIT];
+    /* 尽管我们分配了足够多的client_data对象，但为了提高poll的性能，仍然有必要限制用户数量 */
     pollfd fds[USER_LIMIT+1];
     int user_counter = 0;
     for( int i = 1; i <= USER_LIMIT; ++i )
@@ -90,6 +104,7 @@ int main( int argc, char* argv[] )
                     printf( "errno is: %d\n", errno );
                     continue;
                 }
+                /* 如果请求太多，则关闭新到的连接 */
                 if( user_counter >= USER_LIMIT )
                 {
                     const char* info = "too many users\n";
@@ -98,6 +113,8 @@ int main( int argc, char* argv[] )
                     close( connfd );
                     continue;
                 }
+                /* 对于新的连接，同时修改fds和users数组。
+                前文已经提到，users[connfd]对应于新连接文件描述符connfd的客户数据 */
                 user_counter++;
                 users[connfd].address = client_address;
                 setnonblocking( connfd );
@@ -120,6 +137,7 @@ int main( int argc, char* argv[] )
             }
             else if( fds[i].revents & POLLRDHUP )
             {
+                /* 如果客户端关闭连接，则服务器也关闭对应连接，用户总数-1 */
                 users[fds[i].fd] = users[fds[user_counter].fd];
                 close( fds[i].fd );
                 fds[i] = fds[user_counter];
@@ -150,6 +168,8 @@ int main( int argc, char* argv[] )
                 }
                 else
                 {
+                    // 这是牺牲空间换取时间的做法？
+                    /* 如果接收到客户数据，则通知其他socket连接准备写数据 */
                     for( int j = 1; j <= user_counter; ++j )
                     {
                         if( fds[j].fd == connfd )
@@ -157,9 +177,10 @@ int main( int argc, char* argv[] )
                             continue;
                         }
                         
-                        fds[j].events |= ~POLLIN;
-                        fds[j].events |= POLLOUT;
+                        fds[j].events |= ~POLLIN;   // 不再监视普通数据可读
+                        fds[j].events |= POLLOUT;   // 监视普通数据可写
                         users[fds[j].fd].write_buf = users[connfd].buf;
+                        display(fds, user_counter);
                     }
                 }
             }
@@ -172,8 +193,10 @@ int main( int argc, char* argv[] )
                 }
                 ret = send( connfd, users[connfd].write_buf, strlen( users[connfd].write_buf ), 0 );
                 users[connfd].write_buf = NULL;
+                /* 写完数据后需要重新注册fds[i]上的可读事件 */
                 fds[i].events |= ~POLLOUT;
                 fds[i].events |= POLLIN;
+                display(fds, user_counter);
             }
         }
     }

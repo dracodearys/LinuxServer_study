@@ -21,7 +21,8 @@ int timeout_connect( const char* ip, int port, int time )
 
     int sockfd = socket( PF_INET, SOCK_STREAM, 0 );
     assert( sockfd >= 0 );
-
+    /* 通过选项SO_SRCVTIMEO和SO_SNDTIMEO所设置的超时事件类型是timeval，
+    这和select系统调用的超时参数类型相同 */
     struct timeval timeout;
     timeout.tv_sec = time;
     timeout.tv_usec = 0;
@@ -32,6 +33,7 @@ int timeout_connect( const char* ip, int port, int time )
     ret = connect( sockfd, ( struct sockaddr* )&address, sizeof( address ) );
     if ( ret == -1 )
     {
+        /* 超时对应的错误号是EINPROGRESS，如果条件成立我们就可以处理定时任务了 */
         if( errno == EINPROGRESS )
         {
             printf( "connecting timeout\n" );
