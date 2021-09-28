@@ -41,11 +41,11 @@ public:
     time_heap( int cap ) throw ( std::exception )
         : capacity( cap ), cur_size( 0 )
     {
-	array = new heap_timer* [capacity];     // 创建堆数组
-	if ( ! array )
-	{
-            throw std::exception();
-	}
+        array = new heap_timer* [capacity];     // 创建堆数组
+        if ( ! array )
+        {
+                throw std::exception();
+        }
         for( int i = 0; i < capacity; ++i )
         {
             array[i] = NULL;
@@ -189,7 +189,7 @@ private:
     void percolate_down( int hole )
     {
         heap_timer* temp = array[hole];
-        int child = 0;
+        int child = 0; 
         for ( ; ((hole*2+1) <= (cur_size-1)); hole=child )
         {
             child = hole*2+1;

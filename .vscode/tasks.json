@@ -5,6 +5,7 @@
             "label": "C/C++: g++ build active file",
             "command": "/usr/bin/g++",
             "args": [
+
                 "-g",
                 "${file}",
                 "-o",
@@ -30,7 +31,9 @@
                 "-g",
                 "${file}",
                 "-o",
-                "${fileDirname}/${fileBasenameNoExtension}"
+                "${fileDirname}/${fileBasenameNoExtension}",
+                /*"-lrt"*/
+                "-levent"
             ],
             "options": {
                 "cwd": "${fileDirname}"

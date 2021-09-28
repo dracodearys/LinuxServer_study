@@ -11,7 +11,7 @@ union semun
      unsigned short int* array;
      struct seminfo* __buf;    
 };
-
+/* op为-1时执行P操作，op为1时执行V操作 */
 void pv( int sem_id, int op )
 {
     struct sembuf sem_b;
@@ -37,6 +37,7 @@ int main( int argc, char* argv[] )
     else if( id == 0 )
     {
         printf( "child try to get binary sem\n" );
+        /* 在父子进程之间共享IPC_PRIVATE信号量的关键就在于二者都可以操作该信号量的标识符sem_id */
         pv( sem_id, -1 );
         printf( "child get the sem and would release it after 5 seconds\n" );
         sleep( 5 );
@@ -53,6 +54,6 @@ int main( int argc, char* argv[] )
     }
 
     waitpid( id, NULL, 0 );
-    semctl( sem_id, 0, IPC_RMID, sem_un );
+    semctl( sem_id, 0, IPC_RMID, sem_un );      /* 删除信号量 */
     return 0;
 }

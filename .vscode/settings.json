@@ -1,0 +1,7 @@
+{
+    "files.associations": {
+        "event.h": "c",
+        "event_struct.h": "c",
+        "*.ipp": "cpp"
+    }
+}

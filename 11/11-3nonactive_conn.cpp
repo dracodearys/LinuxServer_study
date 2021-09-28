@@ -39,12 +39,13 @@ void addfd( int epollfd, int fd )
     epoll_ctl( epollfd, EPOLL_CTL_ADD, fd, &event );
     setnonblocking( fd );
 }
-
+/* 信号处理函数 */
 void sig_handler( int sig )
 {
+    /* 保留原来的errno，在函数最后恢复，以保证函数的可重入性 */
     int save_errno = errno;
     int msg = sig;
-    send( pipefd[1], ( char* )&msg, 1, 0 );
+    send( pipefd[1], ( char* )&msg, 1, 0 );/* 将信号值写入管道，以通知主循环 */
     errno = save_errno;
 }
 
@@ -107,6 +108,7 @@ int main( int argc, char* argv[] )
     assert( epollfd != -1 );
     addfd( epollfd, listenfd );
 
+    /* 使用socketpair创建管道，注册pipefd[0]上的可读事件 */
     ret = socketpair( PF_UNIX, SOCK_STREAM, 0, pipefd );
     assert( ret != -1 );
     setnonblocking( pipefd[1] );
@@ -120,7 +122,7 @@ int main( int argc, char* argv[] )
 
     client_data* users = new client_data[FD_LIMIT]; 
     bool timeout = false;
-    alarm( TIMESLOT );
+    alarm( TIMESLOT );      // 每5s向进程发送一个SIGALRM
 
     while( !stop_server )
     {
@@ -149,11 +151,11 @@ int main( int argc, char* argv[] )
                 timer->user_data = &users[connfd];
                 timer->cb_func = cb_func;
                 time_t cur = time( NULL );
-                timer->expire = cur + 3 * TIMESLOT;
+                timer->expire = cur + 3 * TIMESLOT; // 执行3次tick后 定时器到期
                 users[connfd].timer = timer;
                 timer_lst.add_timer( timer );
             }
-            /* 处理信号 */
+            /* 如果就绪的文件描述符是pipefd[0]，则处理信号 */
             else if( ( sockfd == pipefd[0] ) && ( events[i].events & EPOLLIN ) )
             {
                 int sig;
